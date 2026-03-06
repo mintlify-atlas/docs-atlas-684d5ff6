@@ -1,0 +1,117 @@
+---
+title: "Update Ticket Status"
+api: "PATCH /api/tickets/estado"
+description: "Update the status of an existing ticket"
+---
+
+## Authentication
+
+This endpoint requires JWT authentication. Include the bearer token in the Authorization header.
+
+<Note>
+  Authentication is currently commented out in the controller but should be enabled in production.
+</Note>
+
+## Request Body
+
+<ParamField body="Id" type="string" required>
+  The UUID of the ticket to update
+</ParamField>
+
+<ParamField body="EstadoId" type="integer" required>
+  The new status ID to set for the ticket
+</ParamField>
+
+## Response
+
+Returns a response object indicating success or failure of the operation.
+
+<ResponseField name="respuesta" type="boolean">
+  Indicates whether the operation was successful (true) or failed (false)
+</ResponseField>
+
+<ResponseField name="mensaje" type="string">
+  A message describing the result of the operation
+</ResponseField>
+
+<ResponseField name="ticket" type="string">
+  The tracking code of the updated ticket
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X PATCH https://api.example.com/api/tickets/estado \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "EstadoId": 3
+  }'
+```
+
+```csharp C#
+var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization = 
+    new AuthenticationHeaderValue("Bearer", "YOUR_JWT_TOKEN");
+
+var request = new ActualizarEstadoTicketDto
+{
+    Id = Guid.Parse("7c9e6679-7425-40de-944b-e07fc1f90ae7"),
+    EstadoId = 3
+};
+
+var response = await client.PatchAsJsonAsync(
+    "https://api.example.com/api/tickets/estado", 
+    request
+);
+
+var resultado = await response.Content.ReadFromJsonAsync<RespuestaDto>();
+```
+
+</CodeGroup>
+
+## Example Response
+
+```json 200 - Success
+{
+  "respuesta": true,
+  "mensaje": "Ticket status updated successfully",
+  "ticket": "TKT-2024-001234"
+}
+```
+
+```json 404 - Not Found
+{
+  "respuesta": false,
+  "mensaje": "Ticket not found",
+  "ticket": null
+}
+```
+
+```json 400 - Bad Request
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "Id": [
+      "The Id field is required."
+    ]
+  }
+}
+```
+
+```json 401 - Unauthorized
+{
+  "type": "https://tools.ietf.org/html/rfc7235#section-3.1",
+  "title": "Unauthorized",
+  "status": 401
+}
+```
+
+<Note>
+  The endpoint returns a 404 status code when the ticket with the specified ID is not found, as indicated by the `respuesta: false` field in the response.
+</Note>

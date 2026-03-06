@@ -1,80 +1,254 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get the ApiTickets REST API up and running in minutes'
+icon: 'rocket'
 ---
 
-## Get started in three steps
+Get your ticket management API running locally in just a few steps. This guide will walk you through cloning the repository, configuring PostgreSQL, and making your first API call.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have the following installed:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- [.NET 7 SDK](https://dotnet.microsoft.com/download/dotnet/7.0)
+- [PostgreSQL](https://www.postgresql.org/download/) (any recent version)
+- Git
+- A code editor (Visual Studio, VS Code, or Rider)
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the ApiTickets project to your local machine:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    git clone <repository-url>
+    cd ApiTickets
+    ```
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Create the PostgreSQL Database">
+    Connect to your PostgreSQL server and create the database:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```sql
+    CREATE DATABASE "DB_tickets";
+    ```
 
-### Step 3: Go live
+    <Note>
+      Make sure your PostgreSQL server is running on `localhost` with the default port `5432`.
+    </Note>
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Configure the Connection String">
+    Open the `appsettings.json` file located in the `API` folder and configure your PostgreSQL connection:
 
-## Next steps
+    ```json API/appsettings.json
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning"
+        }
+      },
+      "AllowedHosts": "*",
+      "ConnectionStrings": {
+        "Conexion": "Host=localhost;Username=postgres;Password=123456;Database=DB_tickets"
+      },
+      "Jwt": {
+        "key": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+      }
+    }
+    ```
 
-Now that you have your docs running, explore these key features:
+    <Warning>
+      Replace `Username`, `Password`, and `Database` with your actual PostgreSQL credentials. The JWT key should be kept secure in production environments.
+    </Warning>
+
+    Update the connection string parameters:
+    - **Host**: Your PostgreSQL server host (default: `localhost`)
+    - **Username**: Your PostgreSQL username (default: `postgres`)
+    - **Password**: Your PostgreSQL password
+    - **Database**: The database name (`DB_tickets`)
+  </Step>
+
+  <Step title="Configure CORS (Optional)">
+    If you plan to connect a frontend application, configure the allowed origin in `appsettings.Development.json`:
+
+    ```json API/appsettings.Development.json
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning"
+        }
+      },
+      "web": "http://localhost:5173"
+    }
+    ```
+
+    <Info>
+      Change the `web` value to match your frontend application's URL. The default is configured for a Vite/React development server.
+    </Info>
+  </Step>
+
+  <Step title="Restore Dependencies">
+    Navigate to the API project folder and restore the NuGet packages:
+
+    ```bash
+    cd API
+    dotnet restore
+    ```
+
+    This will install the required packages:
+    - Microsoft.AspNetCore.Authentication.JwtBearer (v7.0.20)
+    - Npgsql.EntityFrameworkCore.PostgreSQL
+    - Swashbuckle.AspNetCore (v6.4.0)
+  </Step>
+
+  <Step title="Run the Application">
+    Start the API with the following command:
+
+    ```bash
+    dotnet run
+    ```
+
+    You should see output similar to:
+
+    ```bash
+    info: Microsoft.Hosting.Lifetime[14]
+          Now listening on: https://localhost:5059
+    info: Microsoft.Hosting.Lifetime[0]
+          Application started. Press Ctrl+C to shut down.
+    ```
+
+    <Tip>
+      Note the port number in the output (e.g., `5059`). You'll need this to access the API and Swagger documentation.
+    </Tip>
+  </Step>
+
+  <Step title="Access Swagger Documentation">
+    Open your browser and navigate to the Swagger UI:
+
+    ```
+    http://localhost:5059/swagger/index.html
+    ```
+
+    Replace `5059` with your actual port number from the previous step.
+
+    <Info>
+      Swagger provides an interactive interface to explore and test all available API endpoints. In development mode, Swagger is automatically enabled.
+    </Info>
+  </Step>
+
+  <Step title="Make Your First API Call">
+    Test the login endpoint to verify everything is working correctly.
+
+    ### Using cURL
+
+    ```bash
+    curl -X POST "http://localhost:5059/api/usuario/login" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "correo": "user@example.com",
+        "password": "yourpassword"
+      }'
+    ```
+
+    ### Using Swagger UI
+
+    1. Navigate to the **Usuarios** section
+    2. Click on `POST /api/usuario/login`
+    3. Click **Try it out**
+    4. Enter the request body:
+
+    ```json
+    {
+      "correo": "user@example.com",
+      "password": "yourpassword"
+    }
+    ```
+
+    5. Click **Execute**
+
+    ### Response
+
+    A successful login will return a JWT token in the response:
+
+    ```json
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "usuario": {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "correo": "user@example.com",
+        "nombre": "John Doe"
+      }
+    }
+    ```
+
+    <Note>
+      You'll need to create users in your database before you can log in. The authentication endpoint is defined in `API/Controllers/UsuariosController.cs:19-24`.
+    </Note>
+  </Step>
+</Steps>
+
+## What's Next?
+
+Now that your API is running, explore these resources:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Authentication" icon="lock" href="/configuration/authentication">
+    Learn how JWT authentication works and how to use bearer tokens
+  </Card>
+  <Card title="API Endpoints" icon="code" href="/api/tickets/create">
+    Explore all available endpoints for managing tickets
+  </Card>
+  <Card title="Database Schema" icon="database" href="/architecture/entities">
+    Understand the PostgreSQL database structure and relationships
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/database">
+    Deep dive into configuration options and environment variables
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Database connection failed">
+    Ensure that:
+    - PostgreSQL is running on your machine
+    - The database `DB_tickets` exists
+    - Your credentials in `appsettings.json` are correct
+    - The PostgreSQL server is accepting connections on `localhost:5432`
+  </Accordion>
+
+  <Accordion title="Port already in use">
+    If port 5059 is already in use, .NET will automatically select another port. Check the console output for the actual port number, or specify a custom port in `launchSettings.json`.
+  </Accordion>
+
+  <Accordion title="Swagger page not loading">
+    Swagger is only enabled in Development mode. Ensure you're running the application with the Development environment:
+
+    ```bash
+    dotnet run --environment Development
+    ```
+  </Accordion>
+
+  <Accordion title="CORS errors from frontend">
+    Make sure the frontend URL is correctly configured in `appsettings.Development.json` under the `web` property. The CORS configuration is set up in `API/Program.cs:15-21`.
+  </Accordion>
+</AccordionGroup>
+
+## Project Structure
+
+The ApiTickets project follows Clean Architecture principles:
+
+```
+ApiTickets/
+├── API/                    # Web API layer (controllers, startup)
+├── Application/            # Application logic and services
+├── Domain/                 # Domain entities and DTOs
+├── Infrastructure/         # External services and implementations
+└── Persistence/           # Database context and repositories
+```
+
+<Tip>
+  The main application entry point is in `API/Program.cs`, where services, CORS, authentication, and middleware are configured.
+</Tip>

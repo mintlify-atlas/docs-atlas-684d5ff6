@@ -1,0 +1,152 @@
+---
+title: "Create Ticket"
+api: "POST /api/tickets"
+description: "Create a new support ticket"
+---
+
+## Authentication
+
+This endpoint requires JWT authentication. Include the bearer token in the Authorization header.
+
+<Note>
+  Authentication is currently commented out in the controller but should be enabled in production.
+</Note>
+
+## Request Body
+
+<ParamField body="Titulo" type="string" required>
+  The title of the ticket
+</ParamField>
+
+<ParamField body="Descripcion" type="string" required>
+  Detailed description of the ticket
+</ParamField>
+
+<ParamField body="UsuarioId" type="string" required>
+  UUID of the user creating the ticket
+</ParamField>
+
+<ParamField body="AreaId" type="integer" required>
+  ID of the area/department this ticket belongs to
+</ParamField>
+
+<ParamField body="PrioridadId" type="integer" required>
+  Priority level ID for the ticket
+</ParamField>
+
+<ParamField body="EstadoId" type="integer" required>
+  Initial status ID for the ticket
+</ParamField>
+
+## Response
+
+<ResponseField name="IdTicket" type="string">
+  Unique identifier (GUID) for the created ticket
+</ResponseField>
+
+<ResponseField name="Codigo" type="string">
+  Tracking code for the ticket
+</ResponseField>
+
+<ResponseField name="Titulo" type="string">
+  Title of the ticket
+</ResponseField>
+
+<ResponseField name="Descripcion" type="string">
+  Description of the ticket
+</ResponseField>
+
+<ResponseField name="UsuarioId" type="string">
+  UUID of the user who created the ticket
+</ResponseField>
+
+<ResponseField name="AreaId" type="integer">
+  Area/department ID
+</ResponseField>
+
+<ResponseField name="PrioridadId" type="integer">
+  Priority level ID
+</ResponseField>
+
+<ResponseField name="EstadoId" type="integer">
+  Current status ID
+</ResponseField>
+
+<ResponseField name="FechaCreacion" type="string">
+  Timestamp when the ticket was created (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="FechaActualizacion" type="string">
+  Timestamp when the ticket was last updated (ISO 8601 format)
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.example.com/api/tickets \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Titulo": "Cannot access dashboard",
+    "Descripcion": "I am unable to log into the dashboard. The page returns a 500 error.",
+    "UsuarioId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "AreaId": 1,
+    "PrioridadId": 2,
+    "EstadoId": 1
+  }'
+```
+
+```csharp C#
+var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization = 
+    new AuthenticationHeaderValue("Bearer", "YOUR_JWT_TOKEN");
+
+var request = new CrearticketDto
+{
+    Titulo = "Cannot access dashboard",
+    Descripcion = "I am unable to log into the dashboard. The page returns a 500 error.",
+    UsuarioId = Guid.Parse("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
+    AreaId = 1,
+    PrioridadId = 2,
+    EstadoId = 1
+};
+
+var response = await client.PostAsJsonAsync(
+    "https://api.example.com/api/tickets", 
+    request
+);
+```
+
+</CodeGroup>
+
+## Example Response
+
+```json 200 - Success
+{
+  "IdTicket": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "Codigo": "TKT-2024-001234",
+  "Titulo": "Cannot access dashboard",
+  "Descripcion": "I am unable to log into the dashboard. The page returns a 500 error.",
+  "UsuarioId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "AreaId": 1,
+  "PrioridadId": 2,
+  "EstadoId": 1,
+  "FechaCreacion": "2024-03-15T10:30:00Z",
+  "FechaActualizacion": "2024-03-15T10:30:00Z"
+}
+```
+
+```json 400 - Bad Request
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "Titulo": [
+      "The Titulo field is required."
+    ]
+  }
+}
+```

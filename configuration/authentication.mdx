@@ -1,0 +1,435 @@
+---
+title: 'JWT Authentication'
+description: 'Configure JSON Web Token (JWT) authentication for secure API access'
+icon: 'shield-halved'
+---
+
+## Overview
+
+ApiTickets uses **JWT (JSON Web Token)** authentication to secure API endpoints. Tokens are generated upon successful login and must be included in subsequent requests to access protected resources.
+
+## JWT Configuration
+
+### Secret Key Setup
+
+The JWT secret key is configured in `appsettings.json`:
+
+```json appsettings.json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "Conexion": "Host=localhost;Username=postgres;Password=123456;Database=DB_tickets"
+  },
+  "Jwt": {
+    "key": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+  }
+}
+```
+
+<ParamField path="Jwt.key" type="string" required>
+  The secret key used to sign and validate JWT tokens. Must be a strong, random string with sufficient length (minimum 32 characters recommended).
+</ParamField>
+
+<Warning>
+  The JWT secret key should be kept confidential. Never commit production keys to version control. Use environment variables or secure configuration management in production.
+</Warning>
+
+## Authentication Middleware Setup
+
+JWT authentication is configured in `StartupSetup.cs` using ASP.NET Core's authentication services:
+
+```csharp Application/StartupSetup.cs
+using Domain.Utilidades;
+using Infrastructure.Seguridad;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
+using Persistence.Commands;
+using Persistence.Queries;
+using System.Text;
+
+namespace EducacionContinua.Application
+{
+    public static class StartupSetup
+    {
+        public static IServiceCollection AddStartupSetup(this IServiceCollection service, IConfiguration configuration)
+        {
+            // Queries 
+            service.AddTransient<ICatalogoQueries, CatalogoQueries>();
+            service.AddTransient<IUsuarioQueries, UsuarioQueries>();
+            service.AddTransient<ITicketQueries, TicketQueries>();
+
+            //Commands
+            service.AddTransient<ITicketCommands, TicketCommands>();
+
+            // Utilidades
+            service.AddScoped<IPassword, Password>();
+            
+            // Servicios
+            service.AddScoped<IGenerarToken, GenerarToken>();
+
+            // Autenticacion jwt
+            var key = configuration.GetValue<string>("Jwt:key");
+            var keyBytes = Encoding.ASCII.GetBytes(key);
+
+            service.AddAuthentication(config =>
+            {
+                config.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                config.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(config =>
+            {
+                config.RequireHttpsMetadata = false;
+                config.SaveToken = true;
+                config.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                }
+            });
+
+            return service;
+        }
+    }
+}
+```
+
+### Key Authentication Parameters
+
+<ParamField path="DefaultAuthenticateScheme" type="string">
+  Set to `JwtBearerDefaults.AuthenticationScheme` to use JWT Bearer authentication
+</ParamField>
+
+<ParamField path="RequireHttpsMetadata" type="boolean">
+  Set to `false` for development. **Must be `true` in production** to enforce HTTPS
+</ParamField>
+
+<ParamField path="SaveToken" type="boolean">
+  When `true`, saves the token in `AuthenticationProperties` for later retrieval
+</ParamField>
+
+<ParamField path="ValidateIssuerSigningKey" type="boolean">
+  Validates that the token signature matches the secret key
+</ParamField>
+
+<ParamField path="ValidateLifetime" type="boolean">
+  Checks if the token has expired based on `exp` claim
+</ParamField>
+
+<ParamField path="ClockSkew" type="TimeSpan">
+  Set to `TimeSpan.Zero` for exact expiration validation (default is 5 minutes tolerance)
+</ParamField>
+
+<Note>
+  `ValidateIssuer` and `ValidateAudience` are set to `false` for simplified configuration. For production, consider enabling these with proper issuer and audience values.
+</Note>
+
+## Token Generation
+
+Tokens are generated using the `GenerarToken` service when users successfully authenticate:
+
+```csharp Infrastructure/Seguridad/JWTGenerador.cs
+using Domain.DTOs.UsuarioD;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
+using System.Security.Claims;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Infrastructure.Seguridad
+{
+    public interface IGenerarToken
+    {
+        string GenerarTokenUsuario(UsuarioDto usuarioDto);
+    }
+    
+    public class GenerarToken : IGenerarToken
+    {
+        private readonly IConfiguration _configuracion;
+
+        public GenerarToken(IConfiguration configuration)
+        {
+            _configuracion = configuration;
+        }
+
+        public string GenerarTokenUsuario(UsuarioDto usuarioDto)
+        {
+            var key = _configuracion.GetValue<string>("Jwt:key");
+            var keyBytes = Encoding.ASCII.GetBytes(key);
+
+            var claims = new ClaimsIdentity();
+            claims.AddClaim(new Claim(ClaimTypes.NameIdentifier, Convert.ToString(usuarioDto.IdUsuario)));
+
+            var credencialesToken = new SigningCredentials
+            (
+               new SymmetricSecurityKey(keyBytes),
+               SecurityAlgorithms.HmacSha256Signature
+            );
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = claims,
+                Expires = DateTime.UtcNow.AddDays(10),
+                SigningCredentials = credencialesToken
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var tokenConfig = tokenHandler.CreateToken(tokenDescriptor);
+
+            string tokenCreado = tokenHandler.WriteToken(tokenConfig);
+
+            return tokenCreado;
+        }
+    }
+}
+```
+
+### Token Structure
+
+**Claims**: Contains user identity information
+- `ClaimTypes.NameIdentifier`: User ID from `usuarioDto.IdUsuario`
+
+**Signing Algorithm**: HMAC SHA256 (`HmacSha256Signature`)
+
+**Expiration**: **10 days** from token generation (`DateTime.UtcNow.AddDays(10)`)
+
+<Info>
+  The token expiration is set to 10 days. Adjust this value in `JWTGenerador.cs:44` based on your security requirements. Shorter expiration times are more secure but require users to authenticate more frequently.
+</Info>
+
+## Authentication Flow
+
+<Steps>
+  <Step title="User Login">
+    User sends credentials to the login endpoint:
+    ```http
+    POST /api/usuario/login
+    Content-Type: application/json
+
+    {
+      "username": "user@example.com",
+      "password": "password123"
+    }
+    ```
+  </Step>
+
+  <Step title="Token Generation">
+    If credentials are valid, the API generates a JWT token using `GenerarToken.GenerarTokenUsuario()`:
+    ```json
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "expiration": "2026-03-16T10:30:00Z"
+    }
+    ```
+  </Step>
+
+  <Step title="Client Stores Token">
+    The frontend application stores the token securely (e.g., localStorage, sessionStorage, or memory)
+  </Step>
+
+  <Step title="Authenticated Requests">
+    Client includes the token in the `Authorization` header for subsequent API requests:
+    ```http
+    GET /api/tickets
+    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    ```
+  </Step>
+
+  <Step title="Token Validation">
+    The API middleware validates the token signature, expiration, and extracts user claims before processing the request
+  </Step>
+</Steps>
+
+## Protecting API Endpoints
+
+Use the `[Authorize]` attribute to require authentication for controllers or specific actions:
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+[Authorize]
+[ApiController]
+[Route("api/[controller]")]
+public class TicketsController : ControllerBase
+{
+    // All actions require authentication
+    
+    [HttpGet]
+    public async Task<IActionResult> GetTickets()
+    {
+        // Access user ID from claims
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        // ...
+    }
+}
+```
+
+### Accessing User Information
+
+Retrieve authenticated user data from the `User` principal:
+
+```csharp
+// Get user ID from token claims
+var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+var userIdInt = int.Parse(userId);
+
+// Check if user is authenticated
+if (User.Identity?.IsAuthenticated == true)
+{
+    // User is authenticated
+}
+```
+
+## Configuration Steps
+
+<Steps>
+  <Step title="Generate Strong Secret Key">
+    Create a secure random string for your JWT secret key. Use at least 32 characters:
+    ```bash
+    # Generate a random key (Linux/Mac)
+    openssl rand -base64 64
+    ```
+  </Step>
+
+  <Step title="Update appsettings.json">
+    Add the JWT configuration section:
+    ```json
+    {
+      "Jwt": {
+        "key": "your-generated-secret-key-here"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Configure Production Settings">
+    For production, use environment variables instead of appsettings.json:
+    ```bash
+    export Jwt__key="your-production-secret-key"
+    ```
+  </Step>
+
+  <Step title="Enable HTTPS in Production">
+    Update `RequireHttpsMetadata` to `true` in `StartupSetup.cs` for production builds:
+    ```csharp
+    config.RequireHttpsMetadata = app.Environment.IsProduction();
+    ```
+  </Step>
+</Steps>
+
+## Token Expiration Management
+
+### Adjusting Token Lifetime
+
+Modify the expiration duration in `JWTGenerador.cs`:
+
+```csharp
+// Short-lived tokens (1 hour)
+Expires = DateTime.UtcNow.AddHours(1)
+
+// Medium-lived tokens (1 day)
+Expires = DateTime.UtcNow.AddDays(1)
+
+// Long-lived tokens (30 days)
+Expires = DateTime.UtcNow.AddDays(30)
+```
+
+<Tip>
+  Balance security and user experience: shorter expiration times are more secure but may require frequent re-authentication. Consider implementing refresh tokens for better UX.
+</Tip>
+
+### Handling Expired Tokens
+
+When a token expires, the API returns a `401 Unauthorized` response. Frontend applications should:
+
+1. Detect 401 responses
+2. Clear stored token
+3. Redirect user to login page
+4. Optionally show "Session expired" message
+
+## Security Best Practices
+
+### Secret Key Management
+
+<Warning>
+  - Never hardcode JWT secrets in source code
+  - Use environment variables for production keys
+  - Rotate keys periodically
+  - Use different keys for development and production
+</Warning>
+
+### Token Storage (Frontend)
+
+**Secure Options**:
+- **Memory**: Most secure, lost on page refresh
+- **HttpOnly Cookies**: Protected from XSS attacks
+- **SessionStorage**: Cleared when tab closes
+
+**Avoid**:
+- **LocalStorage**: Vulnerable to XSS attacks
+- **URL Parameters**: Exposed in browser history and logs
+
+### HTTPS Enforcement
+
+```csharp
+config.RequireHttpsMetadata = true;  // Enforce in production
+```
+
+### Additional Claims
+
+Add more user information to tokens for authorization:
+
+```csharp
+claims.AddClaim(new Claim(ClaimTypes.NameIdentifier, usuarioDto.IdUsuario.ToString()));
+claims.AddClaim(new Claim(ClaimTypes.Email, usuarioDto.Email));
+claims.AddClaim(new Claim(ClaimTypes.Role, usuarioDto.Role));
+```
+
+## Troubleshooting
+
+### "Unauthorized" Response on Valid Token
+
+1. Verify token hasn't expired
+2. Check JWT secret key matches between generation and validation
+3. Ensure `Authorization: Bearer <token>` header format is correct
+4. Confirm `UseAuthentication()` is called in `Program.cs`
+
+### Token Validation Fails
+
+- **Invalid Signature**: JWT secret key mismatch
+- **Token Expired**: Check `Expires` claim and system time
+- **Malformed Token**: Ensure complete token string is sent
+
+### CORS Issues with Authentication
+
+Ensure CORS policy includes `AllowCredentials()`:
+
+```csharp
+builder.WithOrigins(web)
+       .AllowAnyMethod()
+       .AllowAnyHeader()
+       .AllowCredentials();  // Required for Authorization header
+```
+
+<Info>
+  The middleware order in `Program.cs` is critical: `UseCors()` → `UseAuthentication()` → `UseAuthorization()`. Incorrect order will cause authentication failures.
+</Info>
+
+## Required NuGet Packages
+
+- **Microsoft.AspNetCore.Authentication.JwtBearer** - JWT authentication middleware
+- **System.IdentityModel.Tokens.Jwt** - JWT token generation and validation

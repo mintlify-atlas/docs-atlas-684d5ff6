@@ -1,0 +1,243 @@
+---
+title: 'Login'
+description: 'Authenticate user and obtain JWT token'
+---
+
+## Endpoint
+
+<Note>
+This endpoint authenticates a user with email and password, returning a JWT token valid for 10 days.
+</Note>
+
+```
+POST /api/usuario/login
+```
+
+## Request Body
+
+<ParamField body="Correo" type="string" required>
+  The user's email address. Email must belong to an active user account.
+</ParamField>
+
+<ParamField body="Password" type="string" required>
+  The user's password. Password is verified using secure hashing.
+</ParamField>
+
+## Response
+
+<ResponseField name="Respuesta" type="boolean">
+  Indicates whether the authentication was successful. Returns `true` on success, `false` on failure.
+</ResponseField>
+
+<ResponseField name="Token" type="string">
+  JWT authentication token. Valid for 10 days from generation. Empty string if authentication fails.
+</ResponseField>
+
+<ResponseField name="Datos" type="object">
+  User information object. Returns `null` if authentication fails.
+  
+  <Expandable title="User Object Properties">
+    <ResponseField name="IdUsuario" type="uuid">
+      Unique identifier for the user.
+    </ResponseField>
+    
+    <ResponseField name="Nombre" type="string">
+      Full name of the user.
+    </ResponseField>
+    
+    <ResponseField name="Correo" type="string">
+      Email address of the user.
+    </ResponseField>
+    
+    <ResponseField name="Rol" type="string">
+      User's role in the system (e.g., Admin, User, etc.).
+    </ResponseField>
+    
+    <ResponseField name="Activo" type="boolean">
+      Indicates if the user account is active.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## JWT Token Details
+
+The API generates JWT tokens with the following characteristics:
+
+- **Algorithm**: HMAC-SHA256
+- **Expiration**: 10 days from generation
+- **Claims**: Includes user ID (`NameIdentifier` claim)
+- **Usage**: Include token in `Authorization` header as `Bearer {token}` for authenticated requests
+
+## Example Request
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.example.com/api/usuario/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Correo": "user@example.com",
+    "Password": "SecurePassword123"
+  }'
+```
+
+```csharp C#
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+
+var client = new HttpClient();
+var loginData = new
+{
+    Correo = "user@example.com",
+    Password = "SecurePassword123"
+};
+
+var content = new StringContent(
+    JsonSerializer.Serialize(loginData),
+    Encoding.UTF8,
+    "application/json"
+);
+
+var response = await client.PostAsync(
+    "https://api.example.com/api/usuario/login",
+    content
+);
+
+var result = await response.Content.ReadAsStringAsync();
+```
+
+```javascript JavaScript
+fetch('https://api.example.com/api/usuario/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    Correo: 'user@example.com',
+    Password: 'SecurePassword123'
+  })
+})
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+```python Python
+import requests
+import json
+
+url = "https://api.example.com/api/usuario/login"
+payload = {
+    "Correo": "user@example.com",
+    "Password": "SecurePassword123"
+}
+
+response = requests.post(url, json=payload)
+data = response.json()
+print(data)
+```
+
+</CodeGroup>
+
+## Example Response
+
+### Success Response (200 OK)
+
+```json
+{
+  "Respuesta": true,
+  "Token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiIxMjM0NTY3OC05MGFiLWNkZWYtMTIzNC01Njc4OTBhYmNkZWYiLCJleHAiOjE3MTAzNjQ4MDB9.Xb5h-JQZ9k7V8mNrP2wY5qL3fR6tE8sA1dC4gH0iJ9k",
+  "Datos": {
+    "IdUsuario": "12345678-90ab-cdef-1234-567890abcdef",
+    "Nombre": "John Doe",
+    "Correo": "user@example.com",
+    "Rol": "Admin",
+    "Activo": true
+  }
+}
+```
+
+### Failed Response (200 OK)
+
+<Warning>
+Note: The API returns HTTP 200 even for failed authentication attempts. Check the `Respuesta` field to determine success or failure.
+</Warning>
+
+```json
+{
+  "Respuesta": false,
+  "Token": "",
+  "Datos": null
+}
+```
+
+## Authentication Failure Reasons
+
+The login will fail (`Respuesta: false`) in the following scenarios:
+
+1. **Invalid Email**: The provided email does not exist in the system
+2. **Inactive Account**: The user account exists but is marked as inactive
+3. **Invalid Password**: The password does not match the stored password hash
+4. **Invalid Credentials**: General authentication failure
+
+<Note>
+For security reasons, the API does not distinguish between different failure reasons in the response.
+</Note>
+
+## Using the Token
+
+Once you receive a token, include it in the `Authorization` header for subsequent authenticated requests:
+
+<CodeGroup>
+
+```bash curl
+curl -X GET https://api.example.com/api/protected-endpoint \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+```csharp C#
+using System.Net.Http;
+using System.Net.Http.Headers;
+
+var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization = 
+    new AuthenticationHeaderValue("Bearer", token);
+
+var response = await client.GetAsync(
+    "https://api.example.com/api/protected-endpoint"
+);
+```
+
+```javascript JavaScript
+fetch('https://api.example.com/api/protected-endpoint', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+})
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+```python Python
+import requests
+
+headers = {
+    'Authorization': f'Bearer {token}'
+}
+
+response = requests.get(
+    'https://api.example.com/api/protected-endpoint',
+    headers=headers
+)
+```
+
+</CodeGroup>
+
+## Security Considerations
+
+- Store the JWT token securely (e.g., HTTP-only cookies, secure storage)
+- Never expose tokens in URLs or logs
+- Implement token refresh mechanism before expiration
+- Use HTTPS in production to prevent token interception
+- Validate token on server-side for every protected request

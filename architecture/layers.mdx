@@ -1,0 +1,644 @@
+---
+title: 'Architecture Layers'
+description: 'Detailed explanation of each layer in the Clean Architecture implementation'
+icon: 'layer-group'
+---
+
+## Layer Overview
+
+ApiTickets implements Clean Architecture through four distinct layers, each with specific responsibilities. Dependencies flow inward, with the Domain layer at the center having no external dependencies.
+
+<CardGroup cols={2}>
+  <Card title="Domain" icon="gem" color="#4CAF50">
+    Core business logic and entities
+  </Card>
+  <Card title="Application" icon="gear" color="#2196F3">
+    Service configuration and orchestration
+  </Card>
+  <Card title="Infrastructure" icon="server" color="#FF9800">
+    Database and external service implementations
+  </Card>
+  <Card title="Persistence" icon="database" color="#9C27B0">
+    Data access with CQRS pattern
+  </Card>
+</CardGroup>
+
+---
+
+## Domain Layer
+
+The **Domain layer** is the heart of the application, containing all business entities and core domain logic. It has **zero dependencies** on other layers or external frameworks.
+
+### Location
+```plaintext
+/Domain
+├── Entities/
+│   ├── TicketE/
+│   │   └── TicketE.cs
+│   ├── UsuarioE/
+│   │   └── UsuarioE.cs
+│   └── CatalogoE/
+│       ├── AreaE.cs
+│       ├── PrioridadE.cs
+│       └── EstadoTicketE.cs
+├── DTOs/
+│   ├── TicketD/
+│   ├── UsuarioD/
+│   └── CatalogoD/
+└── Utilidades/
+    └── Password.cs
+```
+
+### Responsibilities
+
+<AccordionGroup>
+  <Accordion title="Entity Models">
+    Define business entities with their properties and validation rules.
+    
+    ```csharp
+    namespace Domain.Entities.TicketE
+    {
+        [Table("tickets")]
+        public class TicketE
+        {
+            [Key]
+            [Column("id_ticket")]
+            public Guid? IdTicket { get; set; } = Guid.NewGuid();
+
+            [Column("codigo_seguimiento")]
+            public required string Codigo { get; set; }
+
+            [Column("titulo")]
+            public required string Titulo { get; set; }
+
+            [Column("descripcion")]
+            public required string Descripcion { get; set; }
+
+            [Column("id_usuario")]
+            public required Guid UsuarioId { get; set; }
+
+            [Column("id_area")]
+            public required int AreaId { get; set; }
+
+            [Column("id_prioridad")]
+            public required int PrioridadId { get; set; }
+
+            [Column("id_estado")]
+            public required int EstadoId { get; set; }
+
+            [Column("fecha_creacion")]
+            public required DateTime FechaCreacion { get; set; }
+
+            [Column("fecha_actualizacion")]
+            public required DateTime FechaActualizacion { get; set; }
+        }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Data Transfer Objects (DTOs)">
+    Provide clean data structures for transferring data between layers.
+    
+    ```csharp
+    namespace Domain.DTOs.TicketD
+    {
+        public class TicketDto
+        {
+            public Guid? IdTicket { get; set; }
+            public string? Codigo { get; set; }
+            public required string Titulo { get; set; }
+            public required string Descripcion { get; set; }
+            public required Guid UsuarioId { get; set; }
+            public required int AreaId { get; set; }
+            public required int PrioridadId { get; set; }
+            public required int EstadoId { get; set; }
+            public DateTime FechaCreacion { get; set; }
+            public DateTime FechaActualizacion { get; set; }
+
+            public static TicketDto CrearDTO(TicketE ticketE)
+            {
+                return new TicketDto
+                {
+                    IdTicket = ticketE.IdTicket,
+                    Codigo = ticketE.Codigo,
+                    Titulo = ticketE.Titulo,
+                    Descripcion = ticketE.Descripcion,
+                    UsuarioId = ticketE.UsuarioId,
+                    AreaId = ticketE.AreaId,
+                    PrioridadId = ticketE.PrioridadId,
+                    EstadoId = ticketE.EstadoId,
+                    FechaCreacion = ticketE.FechaCreacion,
+                    FechaActualizacion = ticketE.FechaActualizacion,
+                };
+            }
+        }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Domain Utilities">
+    Business-specific utilities like password hashing.
+    
+    ```csharp
+    namespace Domain.Utilidades
+    {
+        public interface IPassword
+        {
+            string Hash(string password);
+            bool Verify(string passwordHash, string inputPassword);
+        }
+        
+        public class Password : IPassword
+        {
+            // Implementation for password hashing and verification
+        }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+The Domain layer uses only .NET standard libraries and data annotations. No external framework dependencies.
+</Note>
+
+---
+
+## Application Layer
+
+The **Application layer** orchestrates the application flow, configures dependency injection, and sets up authentication. It resides within the API project.
+
+### Location
+```plaintext
+/API/Application/
+└── StartupSetup.cs
+```
+
+### Responsibilities
+
+<Steps>
+  <Step title="Service Registration">
+    Registers all application services with the dependency injection container.
+    
+    ```csharp
+    public static class StartupSetup
+    {
+        public static IServiceCollection AddStartupSetup(
+            this IServiceCollection service, 
+            IConfiguration configuration)
+        {
+            // Queries 
+            service.AddTransient<ICatalogoQueries, CatalogoQueries>();
+            service.AddTransient<IUsuarioQueries, UsuarioQueries>();
+            service.AddTransient<ITicketQueries, TicketQueries>();
+
+            //Commands
+            service.AddTransient<ITicketCommands, TicketCommands>();
+
+            // Utilidades
+            service.AddScoped<IPassword, Password>();
+
+            // Servicios
+            service.AddScoped<IGenerarToken, GenerarToken>();
+            
+            // ... JWT configuration
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="JWT Authentication Setup">
+    Configures JWT Bearer authentication for securing API endpoints.
+    
+    ```csharp
+    // Autenticacion jwt
+    var key = configuration.GetValue<string>("Jwt:key");
+    var keyBytes = Encoding.ASCII.GetBytes(key);
+
+    service.AddAuthentication(config =>
+    {
+        config.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        config.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    }).AddJwtBearer(config =>
+    {
+        config.RequireHttpsMetadata = false;
+        config.SaveToken = true;
+        config.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+    ```
+  </Step>
+  
+  <Step title="Dependency Injection Pattern">
+    Uses constructor injection for loose coupling and testability.
+    
+    **Service Lifetimes:**
+    - `AddTransient`: New instance per request (Queries, Commands)
+    - `AddScoped`: Single instance per HTTP request (Password, Token generation)
+  </Step>
+</Steps>
+
+### Integration with Program.cs
+
+```csharp
+// API/Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Setup CORS
+var proveedor = builder.Services.BuildServiceProvider();
+var configuration = proveedor.GetRequiredService<IConfiguration>();
+
+builder.Services.AddCors(opciones =>
+{
+    var web = configuration.GetValue<string>("web");
+    opciones.AddDefaultPolicy(builder => {
+        builder.WithOrigins(web)
+               .AllowAnyMethod()
+               .AllowAnyHeader()
+               .AllowCredentials();
+    });
+});
+
+// Call Application layer setup
+builder.Services.AddStartupSetup(builder.Configuration);
+
+var app = builder.Build();
+
+app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
+```
+
+---
+
+## Infrastructure Layer
+
+The **Infrastructure layer** provides implementations for external concerns such as database access and security services.
+
+### Location
+```plaintext
+/Infrastructure
+├── DBContext.cs
+└── Seguridad/
+    └── JWTGenerador.cs
+```
+
+### Responsibilities
+
+<AccordionGroup>
+  <Accordion title="Database Context (Entity Framework Core)">
+    Manages database connection and entity configurations.
+    
+    ```csharp
+    namespace Infrastructure
+    {
+        public class DBContext : DbContext
+        {
+            private readonly string _connection;
+
+            public DBContext(string connection)
+            {
+                _connection = connection;
+            }
+
+            protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+            {
+                optionsBuilder.UseNpgsql(_connection);
+            }
+
+            protected override void OnModelCreating(ModelBuilder modelBuilder)
+            {
+                base.OnModelCreating(modelBuilder);
+            }
+
+            // DbSets for entities
+            public virtual DbSet<UsuarioE> UsuarioEs { get; set; }
+            public virtual DbSet<AreaE> AreaEs { get; set; }
+            public virtual DbSet<PrioridadE> PrioridadEs { get; set; }
+            public virtual DbSet<EstadoTicketE> EstadoTicketEs { get; set; }
+            public virtual DbSet<TicketE> TicketEs { get; set; }
+        }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="JWT Token Generation">
+    Generates secure JWT tokens for user authentication.
+    
+    ```csharp
+    namespace Infrastructure.Seguridad
+    {
+        public interface IGenerarToken
+        {
+            string GenerarTokenUsuario(UsuarioDto usuarioDto);
+        }
+        
+        public class GenerarToken : IGenerarToken
+        {
+            private readonly IConfiguration _configuracion;
+
+            public GenerarToken(IConfiguration configuration)
+            {
+                _configuracion = configuration;
+            }
+
+            public string GenerarTokenUsuario(UsuarioDto usuarioDto)
+            {
+                var key = _configuracion.GetValue<string>("Jwt:key");
+                var keyBytes = Encoding.ASCII.GetBytes(key);
+
+                var claims = new ClaimsIdentity();
+                claims.AddClaim(new Claim(ClaimTypes.NameIdentifier, 
+                    Convert.ToString(usuarioDto.IdUsuario)));
+
+                var credencialesToken = new SigningCredentials(
+                    new SymmetricSecurityKey(keyBytes),
+                    SecurityAlgorithms.HmacSha256Signature
+                );
+
+                var tokenDescriptor = new SecurityTokenDescriptor
+                {
+                    Subject = claims,
+                    Expires = DateTime.UtcNow.AddDays(10),
+                    SigningCredentials = credencialesToken
+                };
+
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var tokenConfig = tokenHandler.CreateToken(tokenDescriptor);
+                string tokenCreado = tokenHandler.WriteToken(tokenConfig);
+
+                return tokenCreado;
+            }
+        }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Info>
+The Infrastructure layer depends on the Domain layer for entity definitions but provides concrete implementations for external services.
+</Info>
+
+---
+
+## Persistence Layer
+
+The **Persistence layer** implements the **CQRS pattern** (Command Query Responsibility Segregation), separating read and write operations for better performance and scalability.
+
+### Location
+```plaintext
+/Persistence
+├── Queries/
+│   ├── CatalogoQueries.cs
+│   ├── UsuarioQueries.cs
+│   └── TicketQueries.cs
+└── Commands/
+    └── TicketCommands.cs
+```
+
+### CQRS Pattern
+
+<CardGroup cols={2}>
+  <Card title="Queries (Read)" icon="book-open">
+    Handle all read operations using optimized queries
+  </Card>
+  <Card title="Commands (Write)" icon="pen-to-square">
+    Handle all write operations (create, update, delete)
+  </Card>
+</CardGroup>
+
+### Query Implementation
+
+Queries handle read operations with optimizations like `AsNoTracking()` for better performance:
+
+```csharp
+namespace Persistence.Queries
+{
+    public interface ITicketQueries
+    {
+        Task<List<TicketDto>> ObtenerTicketsAsync();
+        Task<ConsultarTicketDto> ObtenerTicketCodigoAsync(string codigo);
+        Task<List<TicketDto>> ObtenerTicketIdUsurioAsync(Guid IdUsuario);
+    }
+
+    public class TicketQueries : ITicketQueries, IDisposable
+    {
+        private readonly DBContext _contexto;
+        private readonly ILogger<TicketQueries> _logger;
+        private readonly IConfiguration _configuracion;
+
+        public TicketQueries(ILogger<TicketQueries> logger, IConfiguration configuration)
+        {
+            _logger = logger;
+            _configuracion = configuration;
+            string? Conexion = _configuracion.GetConnectionString("Conexion");
+            _contexto = new DBContext(Conexion);
+        }
+
+        public async Task<List<TicketDto>> ObtenerTicketsAsync()
+        {
+            _logger.LogDebug("Iniciando {Metodo}", nameof(ObtenerTicketsAsync));
+            try
+            {
+                var tickets = await _contexto.TicketEs
+                    .AsNoTracking()
+                    .Select(a => TicketDto.CrearDTO(a))
+                    .ToListAsync();
+
+                return tickets;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error ejecutando {Metodo}", nameof(ObtenerTicketsAsync));
+                throw;
+            }
+        }
+
+        public async Task<List<TicketDto>> ObtenerTicketIdUsurioAsync(Guid IdUsuario)
+        {
+            var tickets = await _contexto.TicketEs
+                .AsNoTracking()
+                .Where(t => t.UsuarioId == IdUsuario)
+                .Select(t => TicketDto.CrearDTO(t))
+                .ToListAsync();
+
+            return tickets;
+        }
+    }
+}
+```
+
+### Command Implementation
+
+Commands handle write operations with transaction support:
+
+```csharp
+namespace Persistence.Commands
+{
+    public interface ITicketCommands
+    {
+        Task<RespuestaDto> CrearTicketAsync(CrearticketDto crearticketDto);
+        Task<RespuestaDto> ActualizarEstadoTicketAsync(ActualizarEstadoTicketDto dto);
+    }
+    
+    public class TicketCommands : ITicketCommands, IDisposable
+    {
+        private readonly DBContext _contexto;
+        private readonly ILogger<TicketCommands> _logger;
+        private readonly IConfiguration _configuracion;
+
+        public TicketCommands(ILogger<TicketCommands> logger, IConfiguration configuration)
+        {
+            _logger = logger;
+            _configuracion = configuration;
+            string? Conexion = _configuracion.GetConnectionString("Conexion");
+            _contexto = new DBContext(Conexion);
+        }
+
+        public async Task<RespuestaDto> CrearTicketAsync(CrearticketDto crearticketDto)
+        {
+            _logger.LogDebug("Iniciando {Metodo}", nameof(CrearTicketAsync));
+            try
+            {
+                var ultimoTicket = await _contexto.Database
+                    .SqlQuery<int>($"SELECT nextval('ticket_numero_seq') AS \"Value\"")
+                    .SingleAsync();
+
+                string codigo = ultimoTicket.ToString("D3");
+
+                var ticket = new TicketDto
+                {
+                    Codigo = codigo,  
+                    Titulo = crearticketDto.Titulo,
+                    Descripcion = crearticketDto.Descripcion,
+                    UsuarioId = crearticketDto.UsuarioId,
+                    AreaId = crearticketDto.AreaId,
+                    PrioridadId = crearticketDto.PrioridadId,
+                    EstadoId = crearticketDto.EstadoId,
+                    FechaCreacion = DateTime.UtcNow,
+                    FechaActualizacion = DateTime.UtcNow,
+                };
+
+                var ticketE = TicketDto.CrearE(ticket);
+                await _contexto.TicketEs.AddAsync(ticketE);
+                await _contexto.SaveChangesAsync();
+
+                return new RespuestaDto
+                {
+                    respuesta = true,
+                    mensaje = "Ticket creado correctamente.",
+                    ticket = codigo,
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error ejecutando {Metodo}", nameof(CrearTicketAsync));
+                throw;
+            }
+        }
+
+        public async Task<RespuestaDto> ActualizarEstadoTicketAsync(
+            ActualizarEstadoTicketDto dto)
+        {
+            var filasAfectadas = await _contexto.TicketEs
+                .Where(t => t.IdTicket == dto.Id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(t => t.EstadoId, dto.EstadoId)
+                    .SetProperty(t => t.FechaActualizacion, DateTime.UtcNow)
+                );
+
+            if (filasAfectadas == 0)
+            {
+                return new RespuestaDto
+                {
+                    respuesta = false,
+                    mensaje = "No se encontró el ticket."
+                };
+            }
+
+            return new RespuestaDto
+            {
+                respuesta = true,
+                mensaje = "Estado del ticket actualizado correctamente."
+            };
+        }
+    }
+}
+```
+
+### Benefits of CQRS
+
+<CardGroup cols={2}>
+  <Card title="Performance" icon="gauge-high">
+    Optimized queries with AsNoTracking() for reads
+  </Card>
+  <Card title="Scalability" icon="arrows-up-to-line">
+    Independent scaling of read and write operations
+  </Card>
+  <Card title="Clarity" icon="eye">
+    Clear separation between read and write logic
+  </Card>
+  <Card title="Flexibility" icon="wand-magic-sparkles">
+    Different models for reading and writing data
+  </Card>
+</CardGroup>
+
+<Note>
+Both Queries and Commands implement `IDisposable` to properly manage database context lifecycle.
+</Note>
+
+---
+
+## Layer Dependencies Summary
+
+```plaintext
+┌─────────────────────────────────────────────┐
+│              API Layer                      │
+│  - Controllers                              │
+│  - Program.cs                               │
+└───────────────┬─────────────────────────────┘
+                │
+        ┌───────┴────────┐
+        │                │
+        ▼                ▼
+┌──────────────┐  ┌─────────────────┐
+│ Application  │  │ Infrastructure  │
+│  - Startup   │  │  - DBContext    │
+│  - DI Config │  │  - JWT          │
+└──────┬───────┘  └────────┬────────┘
+       │                   │
+       │                   │
+       │         ┌─────────┴──────────┐
+       │         │                    │
+       ▼         ▼                    ▼
+┌────────────────────┐      ┌────────────────┐
+│   Persistence      │      │    Domain      │
+│  - Queries         │─────▶│  - Entities    │
+│  - Commands        │      │  - DTOs        │
+└────────────────────┘      │  - Utilities   │
+                            └────────────────┘
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Entity Models" icon="database" href="/architecture/entities">
+    Learn about domain entities and their relationships
+  </Card>
+  <Card title="API Endpoints" icon="plug" href="/api/tickets/create">
+    Explore the REST API endpoints
+  </Card>
+</CardGroup>

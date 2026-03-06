@@ -1,0 +1,119 @@
+---
+title: "List Tickets"
+api: "GET /api/tickets"
+description: "Retrieve all tickets in the system"
+---
+
+## Authentication
+
+This endpoint requires JWT authentication. Include the bearer token in the Authorization header.
+
+<Note>
+  Authentication is currently commented out in the controller but should be enabled in production.
+</Note>
+
+## Response
+
+Returns an array of ticket objects with detailed information including area, priority, and status names.
+
+<ResponseField name="tickets" type="array">
+  Array of ticket objects
+  
+  <Expandable title="Ticket Object">
+    <ResponseField name="IdTicket" type="string">
+      Unique identifier (GUID) for the ticket
+    </ResponseField>
+    
+    <ResponseField name="Codigo" type="string">
+      Tracking code for the ticket
+    </ResponseField>
+    
+    <ResponseField name="Titulo" type="string">
+      Title of the ticket
+    </ResponseField>
+    
+    <ResponseField name="Descripcion" type="string">
+      Detailed description of the ticket
+    </ResponseField>
+    
+    <ResponseField name="Area" type="string">
+      Name of the area/department
+    </ResponseField>
+    
+    <ResponseField name="Prioridad" type="string">
+      Priority level name
+    </ResponseField>
+    
+    <ResponseField name="Estado" type="string">
+      Current status name
+    </ResponseField>
+    
+    <ResponseField name="FechaCreacion" type="string">
+      Timestamp when the ticket was created (ISO 8601 format)
+    </ResponseField>
+    
+    <ResponseField name="FechaActualizacion" type="string">
+      Timestamp when the ticket was last updated (ISO 8601 format)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET https://api.example.com/api/tickets \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+```csharp C#
+var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization = 
+    new AuthenticationHeaderValue("Bearer", "YOUR_JWT_TOKEN");
+
+var response = await client.GetAsync(
+    "https://api.example.com/api/tickets"
+);
+
+var tickets = await response.Content.ReadFromJsonAsync<List<ConsultarTicketDto>>();
+```
+
+</CodeGroup>
+
+## Example Response
+
+```json 200 - Success
+[
+  {
+    "IdTicket": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "Codigo": "TKT-2024-001234",
+    "Titulo": "Cannot access dashboard",
+    "Descripcion": "I am unable to log into the dashboard. The page returns a 500 error.",
+    "Area": "Technical Support",
+    "Prioridad": "High",
+    "Estado": "Open",
+    "FechaCreacion": "2024-03-15T10:30:00Z",
+    "FechaActualizacion": "2024-03-15T10:30:00Z"
+  },
+  {
+    "IdTicket": "8d4f7780-8536-51ef-c4gd-3d184e2a01bf8",
+    "Codigo": "TKT-2024-001235",
+    "Titulo": "Feature request: Dark mode",
+    "Descripcion": "Would like to have a dark mode option in the application.",
+    "Area": "Product",
+    "Prioridad": "Low",
+    "Estado": "In Progress",
+    "FechaCreacion": "2024-03-14T14:20:00Z",
+    "FechaActualizacion": "2024-03-15T09:15:00Z"
+  }
+]
+```
+
+```json 401 - Unauthorized
+{
+  "type": "https://tools.ietf.org/html/rfc7235#section-3.1",
+  "title": "Unauthorized",
+  "status": 401
+}
+```

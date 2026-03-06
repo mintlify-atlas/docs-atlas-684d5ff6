@@ -1,0 +1,115 @@
+---
+title: "Get Ticket by Code"
+api: "GET /api/tickets/{codigo}"
+description: "Retrieve a specific ticket by its tracking code"
+---
+
+## Authentication
+
+This endpoint requires JWT authentication. Include the bearer token in the Authorization header.
+
+<Note>
+  Authentication is currently commented out in the controller but should be enabled in production.
+</Note>
+
+## Path Parameters
+
+<ParamField path="codigo" type="string" required>
+  The tracking code of the ticket to retrieve
+</ParamField>
+
+## Response
+
+Returns a single ticket object with detailed information.
+
+<ResponseField name="IdTicket" type="string">
+  Unique identifier (GUID) for the ticket
+</ResponseField>
+
+<ResponseField name="Codigo" type="string">
+  Tracking code for the ticket
+</ResponseField>
+
+<ResponseField name="Titulo" type="string">
+  Title of the ticket
+</ResponseField>
+
+<ResponseField name="Descripcion" type="string">
+  Detailed description of the ticket
+</ResponseField>
+
+<ResponseField name="Area" type="string">
+  Name of the area/department
+</ResponseField>
+
+<ResponseField name="Prioridad" type="string">
+  Priority level name
+</ResponseField>
+
+<ResponseField name="Estado" type="string">
+  Current status name
+</ResponseField>
+
+<ResponseField name="FechaCreacion" type="string">
+  Timestamp when the ticket was created (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="FechaActualizacion" type="string">
+  Timestamp when the ticket was last updated (ISO 8601 format)
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET https://api.example.com/api/tickets/TKT-2024-001234 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+```csharp C#
+var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization = 
+    new AuthenticationHeaderValue("Bearer", "YOUR_JWT_TOKEN");
+
+var codigo = "TKT-2024-001234";
+var response = await client.GetAsync(
+    $"https://api.example.com/api/tickets/{codigo}"
+);
+
+var ticket = await response.Content.ReadFromJsonAsync<ConsultarTicketDto>();
+```
+
+</CodeGroup>
+
+## Example Response
+
+```json 200 - Success
+{
+  "IdTicket": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "Codigo": "TKT-2024-001234",
+  "Titulo": "Cannot access dashboard",
+  "Descripcion": "I am unable to log into the dashboard. The page returns a 500 error.",
+  "Area": "Technical Support",
+  "Prioridad": "High",
+  "Estado": "Open",
+  "FechaCreacion": "2024-03-15T10:30:00Z",
+  "FechaActualizacion": "2024-03-15T10:30:00Z"
+}
+```
+
+```json 404 - Not Found
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.4",
+  "title": "Not Found",
+  "status": 404
+}
+```
+
+```json 401 - Unauthorized
+{
+  "type": "https://tools.ietf.org/html/rfc7235#section-3.1",
+  "title": "Unauthorized",
+  "status": 401
+}
+```

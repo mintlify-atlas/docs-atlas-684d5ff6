@@ -1,0 +1,218 @@
+---
+title: 'Database Configuration'
+description: 'Configure PostgreSQL database connection and Entity Framework Core for ApiTickets'
+icon: 'database'
+---
+
+## Overview
+
+ApiTickets uses **PostgreSQL** as its database engine with **Entity Framework Core** and the Npgsql provider for data access. The application follows a clean architecture pattern with a custom DBContext implementation.
+
+## Connection String Configuration
+
+### appsettings.json Structure
+
+The database connection string is configured in the `appsettings.json` file located in the API project:
+
+```json appsettings.json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "Conexion": "Host=localhost;Username=postgres;Password=123456;Database=DB_tickets"
+  },
+  "Jwt": {
+    "key": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+  }
+}
+```
+
+### Connection String Parameters
+
+<ParamField path="Host" type="string" required>
+  PostgreSQL server host address (e.g., `localhost`, `127.0.0.1`, or remote server IP)
+</ParamField>
+
+<ParamField path="Username" type="string" required>
+  PostgreSQL database username
+</ParamField>
+
+<ParamField path="Password" type="string" required>
+  PostgreSQL database password
+</ParamField>
+
+<ParamField path="Database" type="string" required>
+  Target database name (default: `DB_tickets`)
+</ParamField>
+
+<Note>
+  The connection string name `"Conexion"` is referenced throughout the application. Do not change this key unless you also update all references in the codebase.
+</Note>
+
+## Database Context Implementation
+
+### DBContext Class
+
+The application uses a custom `DBContext` class that extends `DbContext` from Entity Framework Core:
+
+```csharp Infrastructure/DBContext.cs
+using Domain.Entities.Catalogos;
+using Domain.Entities.TicketE;
+using Domain.Entities.UsuarioE;
+using Microsoft.EntityFrameworkCore;
+
+namespace Infrastructure
+{
+    public class DBContext : DbContext
+    {
+        private readonly string _connection;
+
+        public DBContext(string connection)
+        {
+            _connection = connection;
+        }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            optionsBuilder.UseNpgsql(_connection);
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+        }
+
+        // Usuario
+        public virtual DbSet<UsuarioE> UsuarioEs { get; set; }
+
+        // Catalogo
+        public virtual DbSet<AreaE> AreaEs { get; set; }
+        public virtual DbSet<PrioridadE> PrioridadEs { get; set; }
+        public virtual DbSet<EstadoTicketE> EstadoTicketEs { get; set; }
+
+        // Ticket
+        public virtual DbSet<TicketE> TicketEs { get; set; }
+    }
+}
+```
+
+### Key Features
+
+- **Constructor Injection**: Connection string is passed via constructor
+- **Npgsql Provider**: Uses `UseNpgsql()` to configure PostgreSQL
+- **DbSet Entities**: Defines database tables for Users, Catalogs, and Tickets
+
+## Using DBContext in Repositories
+
+The DBContext is instantiated in Query and Command classes by retrieving the connection string from configuration:
+
+```csharp Persistence/Queries/CatalogoQueries.cs
+public class CatalogoQueries : ICatalogoQueries, IDisposable
+{
+    private readonly DBContext _contexto = null;
+    private readonly ILogger<CatalogoQueries> _logger;
+    private readonly IConfiguration _configuracion;
+
+    public CatalogoQueries(ILogger<CatalogoQueries> logger, IConfiguration configuration)
+    {
+        _logger = logger;
+        _configuracion = configuration;
+        string? Conexion = _configuracion.GetConnectionString("Conexion");
+        _contexto = new DBContext(Conexion);
+    }
+
+    // Query methods...
+}
+```
+
+<Info>
+  The application follows the Dispose pattern to properly release database connections. Each repository implements `IDisposable` to ensure resources are cleaned up.
+</Info>
+
+## Setup Steps
+
+<Steps>
+  <Step title="Install PostgreSQL">
+    Download and install PostgreSQL from [postgresql.org](https://www.postgresql.org/download/). Ensure the server is running on the default port 5432.
+  </Step>
+
+  <Step title="Create Database">
+    Create a database named `DB_tickets`:
+    ```sql
+    CREATE DATABASE DB_tickets;
+    ```
+  </Step>
+
+  <Step title="Configure Connection String">
+    Update the `ConnectionStrings:Conexion` value in `appsettings.json` with your PostgreSQL credentials:
+    ```json
+    "ConnectionStrings": {
+      "Conexion": "Host=localhost;Username=your_username;Password=your_password;Database=DB_tickets"
+    }
+    ```
+  </Step>
+
+  <Step title="Restore NuGet Packages">
+    Install required Entity Framework Core packages:
+    ```bash
+    dotnet restore
+    ```
+  </Step>
+
+  <Step title="Run the Application">
+    Start the API server:
+    ```bash
+    dotnet run
+    ```
+    The application will automatically connect to PostgreSQL using the configured connection string.
+  </Step>
+</Steps>
+
+## Required NuGet Packages
+
+The following packages are required for database functionality:
+
+- **Microsoft.EntityFrameworkCore** - EF Core framework
+- **Npgsql.EntityFrameworkCore.PostgreSQL** - PostgreSQL provider for EF Core
+
+<Warning>
+  Never commit your production database credentials to version control. Use environment variables or secure configuration management for production deployments.
+</Warning>
+
+## Entity Framework Core Features
+
+The application leverages these EF Core capabilities:
+
+- **AsNoTracking()** - Read-only queries for better performance
+- **DbSet Collections** - Strongly-typed entity access
+- **Async Operations** - All database queries use async/await pattern
+- **LINQ Queries** - Type-safe query composition
+
+## Troubleshooting
+
+### Connection Failed
+
+If you encounter connection errors:
+
+1. Verify PostgreSQL service is running
+2. Check firewall settings allow connections on port 5432
+3. Confirm username and password are correct
+4. Ensure the database `DB_tickets` exists
+
+### Authentication Failed
+
+Update the `pg_hba.conf` file to allow password authentication:
+```
+host    all             all             127.0.0.1/32            md5
+```
+
+Restart PostgreSQL after making changes.
+
+<Tip>
+  Use `\l` in psql to list all databases and verify `DB_tickets` exists.
+</Tip>

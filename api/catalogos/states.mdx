@@ -1,0 +1,148 @@
+---
+title: 'Get States'
+api: 'GET /api/catalogos/estados'
+description: 'Retrieves the list of available states for ticket workflow management'
+---
+
+## Overview
+
+This endpoint returns all possible states in the ticket lifecycle. States represent the current status of a ticket (e.g., Open, In Progress, Resolved, Closed). The `Final` property indicates whether a state represents a terminal status, which is useful for workflow validation and reporting.
+
+## Endpoint
+
+```
+GET /api/catalogos/estados
+```
+
+## Response
+
+Returns an array of ticket state objects.
+
+<ResponseField name="Id" type="integer" required>
+  Unique identifier for the ticket state
+</ResponseField>
+
+<ResponseField name="Nombre" type="string" required>
+  Name of the state (e.g., "Open", "In Progress", "Resolved", "Closed")
+</ResponseField>
+
+<ResponseField name="Final" type="boolean" required>
+  Indicates whether this is a final/terminal state. When `true`, the ticket has reached the end of its lifecycle and typically cannot transition to other states. Used for completion metrics and workflow validation.
+</ResponseField>
+
+## Response Example
+
+<CodeGroup>
+
+```json Success Response (200)
+[
+  {
+    "id": 1,
+    "nombre": "Abierto",
+    "final": false
+  },
+  {
+    "id": 2,
+    "nombre": "En Progreso",
+    "final": false
+  },
+  {
+    "id": 3,
+    "nombre": "En Espera",
+    "final": false
+  },
+  {
+    "id": 4,
+    "nombre": "Resuelto",
+    "final": true
+  },
+  {
+    "id": 5,
+    "nombre": "Cerrado",
+    "final": true
+  },
+  {
+    "id": 6,
+    "nombre": "Cancelado",
+    "final": true
+  }
+]
+```
+
+</CodeGroup>
+
+## Request Example
+
+<CodeGroup>
+
+```bash curl
+curl -X GET "http://localhost:5000/api/catalogos/estados" \
+  -H "Content-Type: application/json"
+```
+
+```csharp C#
+var client = new HttpClient();
+var response = await client.GetAsync("http://localhost:5000/api/catalogos/estados");
+var estados = await response.Content.ReadFromJsonAsync<List<EstadoTicketDto>>();
+```
+
+```javascript JavaScript
+fetch('http://localhost:5000/api/catalogos/estados', {
+  method: 'GET',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+  .then(response => response.json())
+  .then(states => console.log(states));
+```
+
+</CodeGroup>
+
+## Usage Notes
+
+<Note>
+  **Final States:** States where `Final: true` represent completed tickets. These are important for:
+  - Preventing further updates to closed tickets
+  - Calculating completion metrics and KPIs
+  - Filtering active vs. completed work
+  - Generating reports on resolved issues
+</Note>
+
+<Expandable title="Implementation Details">
+
+**Controller:** `CatalogosController.cs:34-39`
+
+**Method:** `ObtenerEstados()`
+
+**DTO:** `EstadoTicketDto.cs` - Maps from `EstadoTicketE` entity
+
+**Database Table:** `estados_ticket`
+
+This endpoint queries all records from the `estados_ticket` table and returns them as `EstadoTicketDto` objects. The `Final` field (mapped from the `es_final` database column) is crucial for implementing workflow rules and determining which states represent ticket completion.
+
+</Expandable>
+
+## Common Use Cases
+
+- **State Transition Dropdowns:** Display available states when updating a ticket
+- **Workflow Validation:** Prevent transitions from final states or enforce valid state flows
+- **Active Ticket Filters:** Show only tickets where `Final: false` for active work queues
+- **Completion Metrics:** Calculate resolution rates using tickets in final states
+- **Status Tracking:** Visualize ticket progress through workflow stages
+- **Automated Workflows:** Trigger notifications or actions when tickets enter final states
+
+<Expandable title="State Workflow Example">
+
+Typical ticket lifecycle flow:
+
+1. **Abierto** (Open) → Initial state when ticket is created
+2. **En Progreso** (In Progress) → Agent begins work
+3. **En Espera** (Waiting) → Waiting for customer response or external dependency
+4. **Resuelto** (Resolved) → Issue fixed, awaiting customer confirmation
+5. **Cerrado** (Closed) → Customer confirmed resolution (Final)
+6. **Cancelado** (Canceled) → Ticket no longer valid (Final)
+
+Your business logic should enforce valid transitions and prevent reopening tickets in final states without proper workflow rules.
+
+</Expandable>

@@ -1,0 +1,286 @@
+---
+title: 'CORS Configuration'
+description: 'Configure Cross-Origin Resource Sharing (CORS) for frontend applications'
+icon: 'globe'
+---
+
+## Overview
+
+**Cross-Origin Resource Sharing (CORS)** allows your frontend application to make HTTP requests to the ApiTickets backend from a different origin. The API is configured to accept requests from a specific frontend URL defined in configuration.
+
+## CORS Setup in Program.cs
+
+The CORS policy is configured in the `Program.cs` file during application startup:
+
+```csharp API/Program.cs
+using EducacionContinua.Application;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var proveedor = builder.Services.BuildServiceProvider();
+var configuration = proveedor.GetRequiredService<IConfiguration>();
+
+builder.Services.AddCors(opciones =>
+{
+    var web = configuration.GetValue<string>("web");
+    opciones.AddDefaultPolicy(builder => {
+        builder.WithOrigins(web).AllowAnyMethod().AllowAnyHeader().AllowCredentials();
+    });
+});
+
+builder.Services.AddStartupSetup(builder.Configuration);
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+
+app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
+```
+
+## Frontend URL Configuration
+
+### Development Environment
+
+The allowed frontend origin is configured in `appsettings.Development.json`:
+
+```json appsettings.Development.json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "web": "http://localhost:5173"
+}
+```
+
+<ParamField path="web" type="string" required>
+  The complete URL of your frontend application, including protocol and port (e.g., `http://localhost:5173` for Vite/React)
+</ParamField>
+
+### Production Environment
+
+For production deployments, create or update `appsettings.Production.json` with your production frontend URL:
+
+```json appsettings.Production.json
+{
+  "web": "https://your-production-domain.com"
+}
+```
+
+<Warning>
+  Always use HTTPS in production. Never allow `http://` origins in production environments.
+</Warning>
+
+## CORS Policy Details
+
+The configured CORS policy includes:
+
+### WithOrigins(web)
+
+Only allows requests from the specified frontend URL. This prevents unauthorized domains from accessing your API.
+
+### AllowAnyMethod()
+
+Permits all HTTP methods:
+- GET
+- POST
+- PUT
+- PATCH
+- DELETE
+- OPTIONS
+
+### AllowAnyHeader()
+
+Allows all HTTP headers in requests, including:
+- `Content-Type`
+- `Authorization`
+- Custom headers
+
+### AllowCredentials()
+
+Enables sending credentials (cookies, authorization headers, TLS client certificates) in cross-origin requests. This is **required** for JWT authentication to work properly.
+
+<Info>
+  The `AllowCredentials()` setting is essential for JWT token authentication. Without it, the `Authorization` header will not be sent with requests.
+</Info>
+
+## Configuration Steps
+
+<Steps>
+  <Step title="Identify Frontend URL">
+    Determine the full URL where your frontend application runs:
+    - **Vite/React**: Usually `http://localhost:5173`
+    - **Next.js**: Usually `http://localhost:3000`
+    - **Angular**: Usually `http://localhost:4200`
+  </Step>
+
+  <Step title="Update appsettings.Development.json">
+    Set the `web` property to your frontend URL:
+    ```json
+    {
+      "web": "http://localhost:5173"
+    }
+    ```
+  </Step>
+
+  <Step title="Configure Production Settings">
+    For production, add your production domain to `appsettings.Production.json`:
+    ```json
+    {
+      "web": "https://tickets.yourdomain.com"
+    }
+    ```
+  </Step>
+
+  <Step title="Restart the API">
+    Restart the API server to apply CORS configuration changes:
+    ```bash
+    dotnet run
+    ```
+  </Step>
+</Steps>
+
+## Multiple Origins (Advanced)
+
+If you need to allow multiple frontend origins, modify the CORS configuration:
+
+```csharp Program.cs
+builder.Services.AddCors(opciones =>
+{
+    opciones.AddDefaultPolicy(builder => {
+        builder.WithOrigins(
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "https://production-domain.com"
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
+    });
+});
+```
+
+## Middleware Order
+
+The CORS middleware must be placed **before** authentication and authorization:
+
+```csharp Program.cs
+app.UseHttpsRedirection();
+
+app.UseCors();              // CORS first
+app.UseAuthentication();    // Then authentication
+app.UseAuthorization();     // Then authorization
+app.MapControllers();
+```
+
+<Note>
+  If CORS is placed after authentication, OPTIONS preflight requests will fail because they don't include authentication headers.
+</Note>
+
+## Security Considerations
+
+### Never Use AllowAnyOrigin with AllowCredentials
+
+```csharp
+// ❌ DANGEROUS - DO NOT USE
+builder.WithOrigins("*").AllowCredentials();
+```
+
+This combination is forbidden by browsers and creates a security vulnerability.
+
+### Validate Origins Strictly
+
+```csharp
+// ✅ GOOD - Specific origin
+builder.WithOrigins("http://localhost:5173")
+
+// ❌ BAD - Wildcard origin with credentials
+builder.SetIsOriginAllowed(_ => true).AllowCredentials()
+```
+
+### Use Environment Variables for Production
+
+```csharp
+var allowedOrigin = configuration.GetValue<string>("web") 
+                    ?? throw new InvalidOperationException("Frontend URL not configured");
+```
+
+<Warning>
+  Always explicitly define allowed origins. Never use wildcards (`*`) or `SetIsOriginAllowed(_ => true)` when `AllowCredentials()` is enabled.
+</Warning>
+
+## Testing CORS Configuration
+
+### Browser Developer Tools
+
+1. Open your frontend application
+2. Open DevTools (F12)
+3. Make an API request
+4. Check the **Network** tab for CORS headers:
+
+```
+Access-Control-Allow-Origin: http://localhost:5173
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+```
+
+### Common CORS Errors
+
+**Error**: "No 'Access-Control-Allow-Origin' header is present"
+- **Solution**: Ensure `UseCors()` is called in middleware pipeline
+
+**Error**: "The CORS protocol does not allow specifying a wildcard"
+- **Solution**: Replace `AllowAnyOrigin()` with `WithOrigins(specificUrl)`
+
+**Error**: "Credentials flag is 'true', but 'Access-Control-Allow-Credentials' header is ''"
+- **Solution**: Add `AllowCredentials()` to CORS policy
+
+<Tip>
+  Use browser DevTools Network tab to inspect CORS headers in both preflight (OPTIONS) and actual requests.
+</Tip>
+
+## Troubleshooting
+
+### CORS Errors Persist After Configuration
+
+1. Verify `appsettings.Development.json` is in the correct directory
+2. Check that `web` configuration key matches exactly
+3. Restart the API server completely
+4. Clear browser cache and hard reload (Ctrl+Shift+R)
+
+### Different Port Numbers
+
+If your frontend runs on a different port, update the configuration:
+
+```json
+{
+  "web": "http://localhost:3000"  // Updated port
+}
+```
+
+### Docker/Container Environments
+
+When running in containers, use the container's exposed host:
+
+```json
+{
+  "web": "http://frontend-container:5173"
+}
+```
