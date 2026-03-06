@@ -1,0 +1,90 @@
+{
+  "projectType": "api-service",
+  "projectName": "ApiTickets",
+  "projectDescription": "REST API for ticket management system built with .NET 7, PostgreSQL, and JWT authentication using Clean Architecture.",
+  "theme": "aspen",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#1E40AF",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/database",
+              "configuration/cors",
+              "configuration/authentication"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/layers",
+              "architecture/entities"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/authentication/login"
+            ]
+          },
+          {
+            "group": "Tickets",
+            "pages": [
+              "api/tickets/create",
+              "api/tickets/list",
+              "api/tickets/get-by-code",
+              "api/tickets/get-by-user",
+              "api/tickets/update-status"
+            ]
+          },
+          {
+            "group": "Catalogos",
+            "pages": [
+              "api/catalogos/areas",
+              "api/catalogos/priorities",
+              "api/catalogos/states"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "JWT Authentication",
+    "Clean Architecture (Domain, Application, Infrastructure, Persistence)",
+    "PostgreSQL with Entity Framework Core",
+    "RESTful API with Swagger documentation",
+    "Ticket management with status tracking",
+    "User authentication and authorization",
+    "Catalog management (Areas, Priorities, States)"
+  ],
+  "publicApiSurface": [
+    "POST /api/usuario/login",
+    "POST /api/tickets",
+    "GET /api/tickets",
+    "GET /api/tickets/{codigo}",
+    "GET /api/tickets/usuario/{usuarioId}",
+    "PATCH /api/tickets/estado",
+    "GET /api/catalogos/areas",
+    "GET /api/catalogos/prioridades",
+    "GET /api/catalogos/estados"
+  ]
+}
